@@ -15,6 +15,23 @@
 | `server.py` | сервер для своего хостинга: отдаёт страницу и API ленты (Python 3.8+, только стандартная библиотека) |
 | `data/feed.seed.json` | стартовые 8 замечаний ОСОП (осень 2026); копируются в `data/feed.json` при первом запуске |
 | `data/feed.json` | рабочая лента; создаётся сервером и в git не попадает |
+| `apps-script/Code.gs` | API ленты поверх Google Таблицы, для GitHub Pages |
+
+## Открытая ссылка без VPN: GitHub Pages + Google Таблица
+
+Это самый простой вариант: бесплатно, без своего сервера.
+
+**Сайт.** В репозитории: Settings → Pages → Build and deployment → Source: *Deploy from a branch*, ветка `main`, папка `/ (root)` → Save. Через минуту-две сайт будет доступен по адресу https://ashirovazizz.github.io/osop.exe/
+
+**Лента.** Без настройки лента на Pages открывается только для чтения: показываются стартовые замечания из `data/feed.seed.json`. Чтобы коллеги могли добавлять замечания, подключите Google Таблицу:
+
+1. Откройте таблицу с лентой (первая строка: `id | date | rpd | course | expert | round | comment | tags | fix | outcome | ts`).
+2. Расширения → Apps Script, вставьте `apps-script/Code.gs`, сохраните.
+3. Начать развёртывание → Новое развёртывание → «Веб-приложение»; запуск от имени «Меня», доступ «Все».
+4. Скопируйте URL `https://script.google.com/macros/s/…/exec` и вставьте его в `index.html` в `const SHEET_API=""`.
+5. Закоммитьте изменение, Pages обновится сам.
+
+Писать в ленту сможет любой, у кого есть ссылка на сайт. Если кто-то начнёт мусорить, записи легко удалить прямо в таблице.
 
 ## Запуск локально
 
@@ -103,7 +120,7 @@ cd /opt/osop-exe && sudo -u osop git pull && sudo systemctl restart osop-exe
 | `POST` | `/api/feed` | `{date, rpd, course, expert, round, comment, tags, fix, outcome, ts}`, обязательно только `comment` |
 | `PATCH` | `/api/feed/<id>` | `{fix, outcome}`, где `outcome` — `wait`, `ok` или `bad` |
 
-Страница сама определяет, где она запущена. На своём сервере она обращается к `/api/feed`, а на claude.ai использует встроенную базу артефакта.
+Страница сама выбирает хранилище ленты по порядку: свой сервер (`/api/feed`) → Google Таблица (`SHEET_API`) → встроенная база claude.ai → стартовая лента `data/feed.seed.json` только для чтения.
 
 ## Как обновлять правила
 

@@ -744,13 +744,42 @@ async function httpStore(){
     watch:(next,fail)=>{listener=next;load().catch(fail);setInterval(()=>{if(!document.hidden)load().catch(()=>{})},20000)}
   };
 }
+/* Google Таблица через Apps Script (apps-script/Code.gs). Пусто — не используется. */
+const SHEET_API="";
+async function sheetStore(){
+  if(!SHEET_API) return null;
+  let listener=null;
+  const load=async()=>{const res=await fetch(SHEET_API);if(!res.ok)throw new Error("load");const arr=await res.json();if(!Array.isArray(arr))throw new Error("load");arr.sort((a,b)=>(b.ts||0)-(a.ts||0));listener&&listener(arr)};
+  // text/plain, чтобы браузер не делал preflight: Apps Script его не поддерживает
+  const send=async body=>{const res=await fetch(SHEET_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});const j=await res.json().catch(()=>({error:"bad response"}));if(j.error){const e=new Error(j.error);e.code="unavailable";throw e}await load()};
+  try{await fetch(SHEET_API,{method:"GET"}).then(r=>{if(!r.ok)throw 0})}catch(e){return null}
+  return {
+    add:d=>send({action:"add",doc:d}),
+    update:(id,p)=>send({action:"update",id,patch:p}),
+    watch:(next,fail)=>{listener=next;load().catch(fail);setInterval(()=>{if(!document.hidden)load().catch(()=>{})},30000)}
+  };
+}
+/* Только чтение: стартовая лента из репозитория (например, на GitHub Pages без SHEET_API). */
+async function seedStore(){
+  let arr;try{const r=await fetch("data/feed.seed.json");if(!r.ok)return null;arr=await r.json()}catch(e){return null}
+  if(!Array.isArray(arr)) return null;
+  arr.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  return {readOnly:true,watch:next=>next(arr)};
+}
 async function startFeed(){
-  const offMsg="Лента недоступна: на claude.ai нужно войти в аккаунт, на своём сервере нужно запустить server.py.";
+  const offMsg="Лента недоступна: нет связи с хранилищем.";
   const timer=setTimeout(()=>{if(!db)feedOff(offMsg)},10000);
-  db=await httpStore()||await claudeStore();
+  const store=await httpStore()||await sheetStore()||await claudeStore()||await seedStore();
   clearTimeout(timer);
-  if(!db){feedOff(offMsg);return}
-  db.watch(arr=>{entries=arr;renderFeed()},()=>{$("#f-list").innerHTML='<p class="empty">Ленту не удалось загрузить. Обнови страницу позже.</p>'});
+  if(!store){feedOff(offMsg);return}
+  const fail=()=>{$("#f-list").innerHTML='<p class="empty">Ленту не удалось загрузить. Обнови страницу позже.</p>'};
+  if(store.readOnly){
+    db=null;$("#f-submit").disabled=true;
+    $("#f-toast").textContent="Сейчас лента только для чтения: запись появится, когда подключат Google Таблицу.";
+    store.watch(arr=>{entries=arr;renderFeed()});return;
+  }
+  db=store;
+  db.watch(arr=>{entries=arr;renderFeed()},fail);
 }
 
 /* ---------- routing ---------- */
