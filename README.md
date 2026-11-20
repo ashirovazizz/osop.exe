@@ -31,7 +31,7 @@ python3 server.py
 ### 1. Код и systemd
 
 ```bash
-sudo git clone <URL репозитория> /opt/osop-exe
+sudo git clone https://github.com/ashirovazizz/osop.exe.git /opt/osop-exe
 ```
 
 ```bash
