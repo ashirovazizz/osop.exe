@@ -17,6 +17,21 @@
 | `data/feed.json` | рабочая лента; создаётся сервером и в git не попадает |
 | `apps-script/Code.gs` | API ленты поверх Google Таблицы, для GitHub Pages |
 
+## Установка на VPS одной командой
+
+На сервере с Debian или Ubuntu:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ashirovazizz/osop.exe/main/deploy/install.sh -o install.sh && sudo bash install.sh
+```
+
+Скрипт ставит git, python3 и nginx, кладёт код в `/opt/osop-exe`, создаёт сервис `osop-exe` и отдельный сайт в nginx. Другие сайты на сервере он не трогает. В конце печатает ссылку: без домена это `http://<IP>:8081`.
+
+- С доменом: `sudo bash install.sh osop.example.ru` (A-запись домена должна смотреть на сервер).
+- С HTTPS: `sudo OSOP_EMAIL=you@mail.ru bash install.sh osop.example.ru`.
+- С паролем на весь сайт: `sudo OSOP_PASSWORD=секрет bash install.sh` (логин `dh`).
+- Обновление: запустить ту же команду ещё раз.
+
 ## Открытая ссылка без VPN: GitHub Pages + Google Таблица
 
 Это самый простой вариант: бесплатно, без своего сервера.
