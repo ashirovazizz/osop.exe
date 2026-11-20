@@ -1,0 +1,769 @@
+<meta charset="utf-8">
+<title>osop.exe</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Press+Start+2P&display=swap">
+<style>
+/* Layout: one terminal window. ASCII header, prompt-style nav, one view at a time (#check #build #rules #feed). Single dark CRT world by choice. */
+:root{
+  --bg:#0b0d12;
+  --panel:#11151c;
+  --line:#253040;
+  --fg:#c9d6cf;
+  --dim:#7f8f8a;
+  --green:#6bff9b;
+  --cyan:#7fe3ff;
+  --pink:#ff6fd2;
+  --amber:#ffc94d;
+  --red:#ff6b6b;
+  --paper:#f6f4ee;
+  --ink:#1c1f24;
+  --ff-pixel:"Press Start 2P","Courier New",monospace;
+  --ff-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono","Consolas",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--ff-mono);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom,rgba(255,255,255,.025) 0 1px,transparent 1px 3px);z-index:50}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+a{color:var(--cyan)}
+:focus-visible{outline:2px dashed var(--amber);outline-offset:2px}
+
+/* header */
+header{display:flex;flex-direction:column;gap:6px}
+.logo{margin:0;color:var(--green);font:13px/1.05 var(--ff-mono);text-shadow:0 0 8px rgba(107,255,155,.45);overflow-x:auto;white-space:pre}
+.tag{color:var(--dim);font-size:13px}
+.tag b{color:var(--pink);font-weight:600}
+.ticker{border-block:1px dashed var(--line);overflow:hidden;white-space:nowrap;font-size:13px;color:var(--amber);padding-block:4px}
+.ticker span{display:inline-block;padding-left:100%;animation:tick 60s linear infinite}
+@keyframes tick{to{transform:translateX(-100%)}}
+
+/* nav */
+nav{display:flex;flex-wrap:wrap;gap:8px 18px}
+nav a{color:var(--dim);text-decoration:none;font-size:15px;padding:2px 0}
+nav a::before{content:"> ";color:var(--line)}
+nav a[aria-current="page"]{color:var(--green)}
+nav a[aria-current="page"]::before{color:var(--green)}
+nav a[aria-current="page"]::after{content:"_";animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+nav small{color:var(--dim);font-size:11px;margin-left:4px}
+
+/* panels */
+.view{display:grid;gap:18px}
+.view[hidden]{display:none!important}
+.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+@media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
+.box{border:1px solid var(--line);background:var(--panel);padding:16px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.box h2{margin:0;font:11px/1.6 var(--ff-pixel);color:var(--cyan);letter-spacing:.04em;text-wrap:balance}
+.box h2 .n{color:var(--pink)}
+.hint{color:var(--dim);font-size:13px;margin:0}
+.hint b{color:var(--fg);font-weight:600}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim);text-transform:lowercase;letter-spacing:.03em}
+input,select,textarea{font:14px/1.45 var(--ff-mono);color:var(--fg);background:var(--bg);border:1px solid var(--line);padding:8px 10px;border-radius:0;width:100%;min-width:0}
+textarea{resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:var(--green);outline:none}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.row>label{flex:1 1 160px}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+button{font:13px/1 var(--ff-mono);color:var(--bg);background:var(--green);border:0;padding:10px 14px;cursor:pointer;text-transform:lowercase}
+button.ghost{background:transparent;color:var(--green);border:1px solid var(--green)}
+button.warn{background:transparent;color:var(--red);border:1px solid var(--line);padding:6px 9px}
+button:hover{filter:brightness(1.12)}
+button:disabled{opacity:.4;cursor:default}
+
+/* report */
+.score{font-size:15px;color:var(--fg)}
+.score .bar{color:var(--green);letter-spacing:-1px}
+.score .bar i{color:var(--line);font-style:normal}
+.verdict{font:11px/1.6 var(--ff-pixel)}
+.v-ok{color:var(--green)}.v-mid{color:var(--amber)}.v-bad{color:var(--red)}
+ul.rep{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+ul.rep li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;font-size:14px}
+.st{font-weight:600}
+.st.ok{color:var(--green)}.st.warn{color:var(--amber)}.st.fail{color:var(--red)}
+ul.rep .why{display:block;color:var(--dim);font-size:13px}
+.chip{display:inline-block;font-size:11px;border:1px solid var(--line);color:var(--dim);padding:0 5px;margin-left:6px;white-space:nowrap}
+.chip.hot{border-color:var(--pink);color:var(--pink)}
+.osop{border-left:3px solid var(--pink);background:rgba(255,111,210,.06);padding:10px 12px;font-size:14px;white-space:pre-wrap}
+.osop .who{display:block;color:var(--dim);font-size:12px;margin-bottom:4px}
+.math{font-size:13px;color:var(--dim);overflow-x:auto}
+.math table{border-collapse:collapse;font-variant-numeric:tabular-nums}
+.math td{padding:1px 10px 1px 0;vertical-align:top}
+.math td.num{text-align:right;color:var(--fg)}
+
+/* build */
+.crit{border:1px dashed var(--line);padding:10px;display:grid;gap:8px}
+.crit-top{display:grid;grid-template-columns:minmax(0,1fr) 90px auto;gap:8px;align-items:end}
+.sum{font-size:14px}
+.sum.ok{color:var(--green)}.sum.bad{color:var(--red)}
+.paper{background:var(--paper);color:var(--ink);padding:16px 18px;font:14px/1.5 Georgia,"Times New Roman",serif;overflow-x:auto}
+.paper p{margin:0 0 8px}
+.paper table{border-collapse:collapse;font-size:13px;margin-top:4px;min-width:560px}
+.paper th,.paper td{border:1px solid #9aa0a8;padding:4px 6px;vertical-align:top;text-align:left}
+.paper .todo{background:#ffe27a;padding:0 3px}
+.missing{color:var(--amber);font-size:13px}
+.toast{color:var(--green);font-size:13px;min-height:1.2em}
+
+/* rules */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px}
+.cl{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.cl li::before{content:"[ ] ";color:var(--green)}
+table.t{border-collapse:collapse;width:100%;font-size:14px}
+table.t th,table.t td{border-bottom:1px dashed var(--line);padding:6px 8px 6px 0;text-align:left;vertical-align:top}
+table.t th{color:var(--dim);font-weight:400;font-size:12px;text-transform:lowercase}
+table.t td.id{color:var(--pink);white-space:nowrap}
+.scroll{overflow-x:auto}
+.src{color:var(--dim);font-size:12px}
+.hyp{color:var(--amber)}
+
+/* feed */
+.stats{display:grid;gap:3px;font-size:13px;font-variant-numeric:tabular-nums}
+.stats div{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr) 28px;gap:8px;align-items:center}
+.stats .b{color:var(--pink);overflow:hidden;white-space:nowrap}
+.stats .c{text-align:right;color:var(--fg)}
+.entries{display:flex;flex-direction:column;gap:12px}
+.entry{border:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.entry .meta{font-size:12px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px 12px}
+.entry .meta b{color:var(--cyan);font-weight:600}
+.entry .c{white-space:pre-wrap;font-size:14px}
+.entry .fix{font-size:13px;color:var(--fg);border-left:2px solid var(--green);padding-left:10px;white-space:pre-wrap}
+.pill{font-size:11px;padding:1px 6px;border:1px solid}
+.pill.ok{color:var(--green);border-color:var(--green)}
+.pill.wait{color:var(--amber);border-color:var(--amber)}
+.pill.bad{color:var(--red);border-color:var(--red)}
+.empty{color:var(--dim);font-size:14px;border:1px dashed var(--line);padding:16px}
+footer{color:var(--dim);font-size:12px;border-top:1px dashed var(--line);padding-top:10px}
+
+@media (prefers-reduced-motion:reduce){
+  .ticker span{animation:none;padding-left:0}
+  nav a[aria-current="page"]::after{animation:none}
+}
+</style>
+
+<div class="wrap">
+<header>
+<pre class="logo" aria-label="osop.exe">
+ ██████  ███████  ██████  ██████     ███████ ██   ██ ███████
+██    ██ ██      ██    ██ ██   ██    ██       ██ ██  ██
+██    ██ ███████ ██    ██ ██████     █████     ███   █████
+██    ██      ██ ██    ██ ██         ██       ██ ██  ██
+ ██████  ███████  ██████  ██      ██ ███████ ██   ██ ███████</pre>
+<p class="tag">переводчик с человеческого на ОСОП · <b>v0.1</b> · DH-центр ИТМО · работает без ИИ, на правилах из 7 замечаний и инструкции ОСОП-2026</p>
+<div class="ticker" aria-hidden="true"><span>*** ОСОП любит таблицы *** сумма критериев = макс. балл ОС *** пиши, за что баллы снимаются *** пример = конкретное название в «кавычках» *** опиши, как студент ПОЛУЧАЕТ задание *** срок + формат (инд/групп) отдельной строкой *** не прячь цифры в середину абзаца *** greetz to all teachers who survived 3 rounds ***</span></div>
+<nav aria-label="разделы">
+  <a href="#check" data-v="check">check<small>проверить ОС</small></a>
+  <a href="#build" data-v="build">build<small>собрать ОС</small></a>
+  <a href="#rules" data-v="rules">rules<small>что хочет ОСОП</small></a>
+  <a href="#feed" data-v="feed">feed<small>лента замечаний</small></a>
+</nav>
+</header>
+
+<!-- ======================= CHECK ======================= -->
+<section class="view two" id="v-check">
+  <div class="box">
+    <h2><span class="n">01</span> вставь описание ОС</h2>
+    <p class="hint">Скопируй текст из поля «Описание оценочного средства» в конструкторе. Проверка идёт по правилам, текст никуда не отправляется.</p>
+    <div class="row">
+      <label for="c-type">тип
+        <select id="c-type">
+          <option value="cur">текущая аттестация</option>
+          <option value="pa">промежуточная (экзамен / зачёт)</option>
+          <option value="kr">курсовая работа / проект</option>
+        </select>
+      </label>
+      <label for="c-max">макс. балл ОС
+        <input id="c-max" type="number" min="0" max="100" inputmode="numeric" placeholder="напр. 16">
+      </label>
+    </div>
+    <label for="c-text">текст
+      <textarea id="c-text" rows="16" spellcheck="false"></textarea>
+    </label>
+    <div class="btns">
+      <button id="c-run">проверить</button>
+      <button class="ghost" id="c-sample">пример: ЦИМ, вернули 19.11</button>
+      <button class="ghost" id="c-clear">очистить</button>
+    </div>
+  </div>
+  <div class="box" aria-live="polite">
+    <h2><span class="n">02</span> что скажет ОСОП</h2>
+    <div id="c-out"></div>
+  </div>
+</section>
+
+<!-- ======================= BUILD ======================= -->
+<section class="view two" id="v-build" hidden>
+  <div class="box">
+    <h2><span class="n">01</span> заполни по-человечески</h2>
+    <p class="hint">Пустые поля превратятся в жёлтые <b>[уточнить]</b>: их видно, и их нельзя забыть. Сейчас открыт пример с «Индивидуальным заданием» из ЦИМ.</p>
+    <div class="row">
+      <label for="b-name">название ОС<input id="b-name"></label>
+      <label for="b-type">тип
+        <select id="b-type">
+          <option value="cur">текущая аттестация</option>
+          <option value="pa">промежуточная (экзамен / зачёт)</option>
+        </select>
+      </label>
+      <label for="b-max">макс. балл ОС<input id="b-max" type="number" min="0" max="100" inputmode="numeric"></label>
+    </div>
+    <label for="b-issue">как студент получает задание (где, когда, в каком виде)<textarea id="b-issue" rows="2"></textarea></label>
+    <div class="row">
+      <label for="b-time">время / срок<input id="b-time"></label>
+      <label for="b-fmt">формат
+        <select id="b-fmt">
+          <option value="ind">индивидуальный</option>
+          <option value="grp">групповой</option>
+        </select>
+      </label>
+      <label for="b-grp">размер группы<input id="b-grp" placeholder="3–5 человек"></label>
+    </div>
+    <label for="b-result">что студент сдаёт на выходе (объём, форма)<input id="b-result"></label>
+    <label for="b-example">пример задания (конкретно: название темы, статьи, проекта)<textarea id="b-example" rows="3"></textarea></label>
+    <label for="b-questions" id="b-questions-wrap" hidden>перечень вопросов для подготовки (по одному на строку)<textarea id="b-questions" rows="4"></textarea></label>
+    <label for="b-proc">процедура представления (куда сдаётся, защита, презентация)<textarea id="b-proc" rows="2"></textarea></label>
+    <div class="row">
+      <label for="b-rep">повторяется раз за семестр (0 — не повторяется)<input id="b-rep" type="number" min="0" max="40" inputmode="numeric"></label>
+    </div>
+    <h2><span class="n">02</span> критерии</h2>
+    <div id="b-crits" class="entries"></div>
+    <div class="btns"><button class="ghost" id="b-add">+ критерий</button></div>
+    <div id="b-sum" class="sum"></div>
+  </div>
+  <div class="box">
+    <h2><span class="n">03</span> так это увидит эксперт</h2>
+    <div class="btns">
+      <button id="b-copy">скопировать для конструктора</button>
+      <button class="ghost" id="b-tocheck">прогнать через check</button>
+    </div>
+    <div class="toast" id="b-toast" role="status"></div>
+    <div id="b-missing" class="missing"></div>
+    <div class="paper" id="b-out"></div>
+  </div>
+</section>
+
+<!-- ======================= RULES ======================= -->
+<section class="view" id="v-rules" hidden>
+  <div class="cols">
+    <div class="box">
+      <h2>ОС текущей аттестации</h2>
+      <ul class="cl">
+        <li>технология применения: регламент выполнения</li>
+        <li>время на выполнение, формат (индивидуальный / групповой)</li>
+        <li>примеры заданий; для коллоквиума перечень вопросов</li>
+        <li>процедура представления и защиты, шаблон отчёта</li>
+        <li>лабораторные: перечень, задания, ход работы</li>
+        <li>критерии и шкала оценивания</li>
+      </ul>
+      <p class="src">инструкция ОСОП «РПД в Конструкторе ОП», 2026, с. 13</p>
+    </div>
+    <div class="box">
+      <h2>ОС промежуточной аттестации</h2>
+      <ul class="cl">
+        <li>технология применения: регламент выполнения</li>
+        <li>время на выполнение, формат</li>
+        <li>примеры заданий, перечень вопросов к зачёту / экзамену</li>
+        <li>процедура представления результатов</li>
+        <li>критерии и шкала оценивания</li>
+      </ul>
+      <p class="src">там же, с. 12</p>
+    </div>
+    <div class="box">
+      <h2>Курсовая работа / проект</h2>
+      <ul class="cl">
+        <li>структура и объём, сроки</li>
+        <li>процедура выполнения и защиты</li>
+        <li>примерный перечень тем</li>
+        <li>задачи студента</li>
+        <li>рекомендуемые источники</li>
+        <li>критерии и шкала (отдельные 100 баллов)</li>
+      </ul>
+      <p class="src">там же, с. 14</p>
+    </div>
+  </div>
+  <div class="box">
+    <h2>Неписаные правила</h2>
+    <p class="hint">Выведены из реальных замечаний. Число в скобках показывает, сколько раз правило всплыло в ленте.</p>
+    <div class="scroll"><table class="t" id="r-table">
+      <thead><tr><th>id</th><th>правило</th><th>откуда</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+  <div class="box">
+    <h2>Словарь: ОСОП пишет → это значит</h2>
+    <div class="scroll"><table class="t">
+      <thead><tr><th>ОСОП пишет</th><th>что от тебя хотят</th></tr></thead>
+      <tbody>
+        <tr><td>«пропишите подробно шкалу оценивания»</td><td>таблица критериев плюс для каждого: за что максимум, за что снижается, за что 0</td></tr>
+        <tr><td>«за что баллы снимаются, за что добавляются»</td><td>колонки «максимум, если…» и «снижается, если…» у каждого критерия</td></tr>
+        <tr><td>«критерии оценивания с указанием баллов»</td><td>у каждого критерия свой макс. балл, сумма равна максимуму ОС</td></tr>
+        <tr><td>«добавьте пример задания (темы или статьи)»</td><td>2–3 конкретных названия в кавычках, без «например, эссе»</td></tr>
+        <tr><td>«формат проведения»</td><td>индивидуально или в группе, очно или асинхронно, как сдаётся</td></tr>
+        <tr><td>«опишите процесс получения задания»</td><td>где, когда и в каком виде студент получает условие</td></tr>
+        <tr><td>«оформите балл в таблицу»</td><td>нумерованный список «от 0 до N» уже не проходит</td></tr>
+        <tr><td>«сколько баллов на каждом занятии»</td><td>повторяемость отдельной строкой: 6 занятий × 4 балла = 24</td></tr>
+        <tr><td>«подробное описание результатов выполнения»</td><td>что студент сдаёт на выходе и чему научился</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+  <div class="box">
+    <h2>Про планку</h2>
+    <p class="hint">Одобренные РПД 2024–2025 годов часто беднее тех, что возвращают в 2026-м. Например, в 54394 только список критериев, а её приняли. Старые одобренные РПД — <b>не образец</b>. Ориентируйся на свежие замечания из ленты и смотри на эксперта и дату.</p>
+  </div>
+</section>
+
+<!-- ======================= FEED ======================= -->
+<section class="view" id="v-feed" hidden>
+  <div class="two view">
+    <div class="box">
+      <h2><span class="n">01</span> топ претензий</h2>
+      <div class="stats" id="f-stats"><p class="hint">Загружаю ленту…</p></div>
+    </div>
+    <div class="box">
+      <h2><span class="n">02</span> пришло замечание? запиши</h2>
+      <p class="hint">Скопируй текст комментария эксперта из конструктора. Теги правил расставятся сами. Когда РПД пройдёт или вернётся снова, дополни итог.</p>
+      <form id="f-form" class="view" style="gap:10px">
+        <div class="row">
+          <label for="f-date">дата<input id="f-date" type="date"></label>
+          <label for="f-rpd">id РПД<input id="f-rpd" inputmode="numeric" placeholder="57961"></label>
+          <label for="f-round">раунд<input id="f-round" type="number" min="1" max="20" value="1"></label>
+        </div>
+        <div class="row">
+          <label for="f-course">дисциплина<input id="f-course"></label>
+          <label for="f-expert">эксперт<input id="f-expert" placeholder="ФИО из комментария"></label>
+        </div>
+        <label for="f-comment">текст замечания<textarea id="f-comment" rows="4" required></textarea></label>
+        <div id="f-tags" class="hint"></div>
+        <label for="f-fix">что исправили (можно позже)<textarea id="f-fix" rows="2"></textarea></label>
+        <div class="btns"><button type="submit" id="f-submit">в ленту</button></div>
+        <div class="toast" id="f-toast" role="status"></div>
+      </form>
+    </div>
+  </div>
+  <div class="box">
+    <h2><span class="n">03</span> лента</h2>
+    <div class="entries" id="f-list"><p class="empty">Загружаю ленту…</p></div>
+  </div>
+</section>
+
+<footer>osop.exe v0.1 · правила: инструкция ОСОП-2026 + замечания экспертов, осень 2026 · проверка check идёт в браузере, ничего не отправляет · лента общая для всех, у кого есть ссылка</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- rules ---------- */
+const RULES={
+  R1:{t:"Критерии оформлены таблицей: критерий, мин., макс., итого",src:"ЦИМ, 19.11.2026: «Оформите балл в таблицу»"},
+  R2:{t:"У каждого критерия описано, за что максимум, за что снижается, за что 0",src:"5 из 7 замечаний: «за что баллы добавляются, за что снимаются»"},
+  R3:{t:"Сумма баллов по критериям равна максимуму ОС; повторяемость (N занятий × M баллов) написана явно",src:"ЦИМ, 19.11.2026: «сколько баллов… на каждом занятии»"},
+  R4:{t:"Описано, как студент получает задание: где, когда, в каком виде",src:"ЦИМ, 19.11.2026: «Описать процесс получения индивидуального задания»"},
+  R5:{t:"Пример задания конкретный: название темы, статьи, игры, проекта",src:"ИС, МиК, ТКД, ПС: «пример задания (темы или статьи)»"},
+  R6:{t:"Указаны время на выполнение, объём, количество заданий, тайминг",src:"ЦИМ, 1-й раунд: «итоговое количество заданий», «тайминг дискуссии»"},
+  R7:{t:"Указан формат: индивидуально или в группе, формат сдачи",src:"ИС, МиК, ТКД, ЦИМ, ПС: «формат проведения», «формат сдачи»"},
+  R8:{t:"Для дискуссий и проектов: цели и ожидаемый результат для студента",src:"ЦИМ, ПС: «цели и предполагаемые результаты»"},
+  R9:{t:"Заполнены пререквизиты (входные знания)",src:"ПС (Аширов), 20.10.2026"},
+  R10:{t:"Ключевые цифры вынесены в начало отдельными строками, а не спрятаны в абзаце",src:"гипотеза: не подтверждена",hyp:true}
+};
+
+/* ---------- CHECK ---------- */
+const SAMPLE={type:"cur",max:16,text:
+"Индивидуальное задание разделено на три части, каждая из которых выполняется с помощью инструментов, изученных в ходе курса. Пример части задания: Изменение css-стилей в шаблоне, присланном преподавателем в соответствии c заданной темой\nКритерии оценивания:\n1. Корректное использование инструментов: от 0 до 8 баллов.\n2. Полнота выполнения заданий: от 0 до 6 баллов.\n3. Креативный подход к решению заданий: от 0 до 2 баллов."};
+
+const NUMLINE=/^(\d{1,3})(\s*балл\w*)?\.?$/i;
+const HEADER=/^(критери\w*|мин\w*\.?(\s*балл\w*)?|макс\w*\.?(\s*балл\w*)?|баллы?|минимум|максимум|показател\w*|оценка)\s*$/i;
+const TOTAL=/^(итого|всего|сумма)/i;
+const SCALE=/шкала перевода|\d+\s*[-–]\s*\d+\s*балл\w*\s*[-–—]\s*\d?\s*[A-F]X?|\(отлично\)|\(хорошо\)/i;
+
+function parseCriteria(text){
+  const lines=text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  const crits=[];let itogo=null,table=false,totalMention=null;
+  for(let i=0;i<lines.length;i++){
+    const L=lines[i];
+    if(SCALE.test(L)) continue;
+    // table row: tab or pipe separated
+    const sep=L.includes("\t")?"\t":(L.includes("|")?"|":null);
+    if(sep){
+      const cells=L.split(sep).map(s=>s.trim()).filter(Boolean);
+      if(cells.length>=2){
+        const lastNum=[...cells].reverse().find(c=>NUMLINE.test(c));
+        const label=cells[0];
+        if(HEADER.test(label)){table=true;continue}
+        if(lastNum!==undefined && !NUMLINE.test(label)){
+          const n=parseInt(lastNum,10);table=true;
+          if(TOTAL.test(label)) itogo=n; else addCrit(label,n);
+          continue;
+        }
+      }
+    }
+    // vertical table (cell per line)
+    if(NUMLINE.test(L)){
+      let j=i;const nums=[];
+      while(j<lines.length && NUMLINE.test(lines[j])){nums.push(parseInt(lines[j],10));j++}
+      const label=i>0?lines[i-1]:"";
+      if(label && !NUMLINE.test(label) && !HEADER.test(label)){
+        table=true;
+        if(TOTAL.test(label)) itogo=nums[nums.length-1];
+        else addCrit(label,nums[nums.length-1]);
+      }
+      i=j-1;continue;
+    }
+    if(HEADER.test(L)){continue}
+    // total mention
+    const tm=L.match(/(?:макс\.?|максимум|можно набрать|итого|всего)[^0-9]{0,25}(\d{1,3})\s*балл/i);
+    if(tm && /(критери|шкал|итого|всего|можно набрать|за все|ОС|оценочн)/i.test(L)){totalMention=parseInt(tm[1],10);continue}
+    // inline criteria (several per line possible)
+    const IN=/от\s*0\s*до\s*(\d{1,3})|\(?\s*0\s*[-–—]\s*(\d{1,3})\s*балл\S*\)?|до\s*(\d{1,3})\s*балл\S*|(?:максимум|макс\.?)\s*[—–:-]?\s*(\d{1,3})\s*балл\S*|[\[(]\s*(\d{1,3})\s*балл\S*[\])]?|[—–:-]\s*(\d{1,3})\s*балл\S*/gi;
+    let m,prev=0;
+    while((m=IN.exec(L))){
+      const n=parseInt(m.slice(1).find(x=>x!==undefined),10);
+      const seg=L.slice(prev,m.index);prev=m.index+m[0].length;
+      let label=(seg.split(/\d+[).]\s*|[;•*]\s*|\.\s+/).map(s=>s.trim()).filter(s=>s.length>2).pop()||"").replace(/[\s:(\[—–-]+$/,"").trim();
+      if(!label) label="критерий "+(crits.length+1);
+      addCrit(label,n);
+    }
+  }
+  function addCrit(label,max){if(!crits.some(c=>c.label.toLowerCase()===label.toLowerCase()))crits.push({label,max})}
+  // repetition
+  let mult=null;
+  const cnt=text.match(/(\d{1,2})\s*(занят\w*|семинар\w*|встреч\w*|раз\w*|этап\w*|част\w*)/i);
+  const per=text.match(/кажд\w*[^.]{0,80}?(\d{1,2})\s*балл/i)||text.match(/по\s*(\d{1,2})\s*балл\w*\s*за\s*(кажд|одн)/i);
+  if(cnt&&per) mult={n:parseInt(cnt[1],10),per:parseInt(per[1],10)};
+  return {crits,itogo,table,totalMention,mult,lines};
+}
+
+const RX={
+  issue:/(выда[её]т|выдаётся|выдается|выдач|получа\w*\s+(задани|услови)|публику|размеща|ЦДО|LMS|moodle|classroom|на (первом|вводном)?\s*занятии|рассыла|по (электронной )?почте|в чат|телеграм|открывается в курсе)/i,
+  time:/(\d+\s*(мин|час|ч\.|недел|дн|день|дня|академ|пар[ыа]?(\s|$))|срок|дедлайн|в течение|до конца (семестр|модул)|к \d+ (недел|занят))/i,
+  fmt:/(индивидуальн|групп|команд|в парах|парами|самостоятельн)/i,
+  ex:/(пример|например|темы?:|список тем|перечень тем|вопросы? (к|для)|возможные вопросы)/i,
+  exConcrete:/[«"“].{4,}?[»"”]/,
+  proc:/(сда[её]|сдач|загруж|прикрепл|присыла|высыла|отправл|защит|презентац|выступ|доклад|представля\w*\s+(результат|работ)|публикует)/i,
+  crit:/критери/i,
+  levels:/(снима|снижа|вычита|штраф|не засчит|ставится 0|0 балл\w*[^.]{0,20}(если|ставится|выставля)|максимальн\w* балл\w*[^.]{0,15}(ставится|выставля|получа|,? если)|балл\w* ставится,? если|получает \d+ балл)/i,
+  questions:/(вопрос\w* (для|к) (подготовк|зач|экзам)|перечень вопросов|билет|вопросы:)/i,
+  volume:/(объ[её]м|страниц|знаков|слов|структур)/i,
+  themes:/(тем[аы]|тематик)/i,
+  sources:/(литератур|источник)/i
+};
+
+function analyze(text,type,maxIn){
+  const P=parseCriteria(text);
+  const R=[];
+  const add=(st,label,why,rule,osop)=>R.push({st,label,why,rule,osop});
+  const has=k=>RX[k].test(text);
+  const esli=(text.match(/если/gi)||[]).length;
+
+  if(type!=="kr"){
+    has("issue")?add("ok","как выдаётся задание","есть","R4")
+      :add("fail","как выдаётся задание","не сказано, где и когда студент получает задание","R4","Опишите процесс получения задания: где и когда студент его получает.");
+  }
+  has("time")?add("ok","время / срок","есть","R6")
+    :add("fail","время / срок","нет срока или времени на выполнение","R6","Укажите время на выполнение задания.");
+  if(type!=="kr"){
+    has("fmt")?add("ok","формат: индивидуальный / групповой","есть","R7")
+      :add("fail","формат: индивидуальный / групповой","не указано, индивидуально или в группе","R7","Укажите формат выполнения (индивидуальный / групповой).");
+  }
+  if(type==="pa"){
+    has("questions")?add("ok","перечень вопросов","есть","R5")
+      :add("fail","перечень вопросов","для экзамена и зачёта нужен перечень вопросов для подготовки","R5","Добавьте перечень вопросов для подготовки к зачёту / экзамену.");
+  }
+  if(type==="kr"){
+    has("themes")?add("ok","примерный перечень тем","есть","R5"):add("fail","примерный перечень тем","нет тем или порядка их выбора","R5","Добавьте примерный перечень тем курсовой работы.");
+    has("volume")?add("ok","структура и объём","есть","R6"):add("fail","структура и объём","не описаны структура и объём работы","R6","Укажите структуру и объём работы.");
+    has("sources")?add("ok","рекомендуемые источники","есть","R5"):add("fail","рекомендуемые источники","нет списка источников","R5","Добавьте рекомендуемые источники информации.");
+  }else{
+    if(!has("ex")) add("fail","пример задания","примера нет","R5","Добавьте, пожалуйста, пример задания (темы или статьи).");
+    else if(!RX.exConcrete.test(text)) add("warn","пример задания","пример есть, но без конкретного названия в «кавычках»; ОСОП любит конкретику","R5","Конкретизируйте пример задания: укажите названия тем / статей / проектов.");
+    else add("ok","пример задания","есть, с конкретным названием","R5");
+  }
+  has("proc")?add("ok","процедура сдачи / защиты","есть","R7")
+    :add("fail","процедура сдачи / защиты","не сказано, куда и как сдаётся результат","R7","Опишите процедуру представления результатов (формат сдачи).");
+  has("crit")?add("ok","критерии оценивания","есть","R2")
+    :add("fail","критерии оценивания","слова «критерии» в тексте нет","R2","Добавьте критерии оценивания с указанием баллов.");
+
+  const crits=P.crits;const sum=crits.reduce((a,c)=>a+c.max,0);
+  const maxEff=(type==="kr")?100:(maxIn||P.totalMention||null);
+  if(crits.length<2){
+    add("fail","баллы у критериев","не нашёл баллов у отдельных критериев","R3","Укажите баллы по каждому критерию оценивания.");
+  }else{
+    add("ok","баллы у критериев","критериев с баллами: "+crits.length,"R3");
+    if(!maxEff) add("warn","сумма = максимум","укажи макс. балл ОС слева, чтобы сверить сумму ("+sum+")","R3");
+    else if(sum===maxEff) add("ok","сумма = максимум",sum+" = "+maxEff,"R3");
+    else if(P.mult && sum===P.mult.per && P.mult.n*P.mult.per===maxEff) add("warn","сумма = максимум","сходится только через повторяемость "+P.mult.n+" × "+P.mult.per+" = "+maxEff+". Вынеси это первой строкой или в таблицу: ЦИМ вернули именно за это","R3","Укажите, сколько баллов возможно получить за выполнение задания на каждом занятии.");
+    else if(P.itogo && P.itogo===sum && P.mult && P.mult.n*sum===maxEff) add("warn","сумма = максимум","сходится через "+P.mult.n+" × "+sum+"; напиши это явно отдельной строкой","R3");
+    else add("fail","сумма = максимум","критерии дают "+sum+", а макс. балл ОС "+maxEff,"R3","Сумма баллов по критериям не соответствует максимальному баллу оценочного средства — укажите распределение баллов.");
+  }
+  if(crits.length>=2){
+    P.table?add("ok","баллы в таблице","таблица найдена","R1")
+      :add("fail","баллы в таблице","критерии списком «от 0 до N»; нужна таблица","R1","Оформите баллы в таблицу.");
+  }
+  (RX.levels.test(text)||(crits.length>0&&esli>=crits.length))
+    ?add("ok","за что начисляют / снимают","есть описание уровней","R2")
+    :add("fail","за что начисляют / снимают","не сказано, за что ставят максимум, а за что снижают","R2","Пропишите подробно шкалу оценивания: за что баллы начисляются, за что снимаются.");
+  const breaks=P.lines.length;
+  if(text.length>700 && breaks<5) add("warn","читаемость","длинный сплошной абзац: эксперт может не увидеть цифры. Разбей на блоки с подзаголовками","R10");
+
+  return {R,P,sum,maxEff};
+}
+
+let feedCounts={};
+function renderCheck(){
+  const text=$("#c-text").value.trim();
+  const out=$("#c-out");
+  if(!text){out.innerHTML='<p class="hint">Вставь текст слева или нажми <b>пример: ЦИМ</b>. Это реальное ОС, которое вернули 19.11, посмотри, совпадёт ли прогноз с настоящим замечанием.</p>';return}
+  const type=$("#c-type").value;const maxIn=parseInt($("#c-max").value,10)||null;
+  const {R,P,sum,maxEff}=analyze(text,type,maxIn);
+  const pts=R.reduce((a,r)=>a+(r.st==="ok"?1:r.st==="warn"?0.5:0),0);
+  const tot=R.length;const pct=pts/tot;
+  const w=20,f=Math.round(pct*w);
+  const fails=R.filter(r=>r.st==="fail").length;
+  const verdict=fails===0?(pct>.95?['v-ok','READY TO SUBMIT']:['v-mid','ПОЧТИ: ПОПРАВЬ ЖЁЛТОЕ']):(fails<=2?['v-mid','ВЕРНУТ С 1–2 ЗАМЕЧАНИЯМИ']:['v-bad','ВЕРНУТ НА ДОРАБОТКУ']);
+  let h='<div class="score"><span class="bar">['+"█".repeat(f)+'<i>'+"░".repeat(w-f)+'</i>]</span> '+(Math.round(pts*10)/10)+' / '+tot+'</div>';
+  h+='<div class="verdict '+verdict[0]+'">'+verdict[1]+'</div>';
+  h+='<ul class="rep">'+R.map(r=>{
+    const c=feedCounts[r.rule]||0;
+    const chip=c?'<span class="chip'+(c>=3?' hot':'')+'" title="столько раз это правило всплывало в ленте">'+r.rule+' ×'+c+'</span>':'<span class="chip">'+r.rule+'</span>';
+    return '<li><span class="st '+r.st+'">'+(r.st==="ok"?"[OK]":r.st==="warn"?"[??]":"[!!]")+'</span><span>'+esc(r.label)+chip+'<span class="why">'+esc(r.why)+'</span></span></li>'}).join("")+'</ul>';
+  const os=R.filter(r=>r.st!=="ok"&&r.osop).map(r=>r.osop);
+  if(os.length){
+    h+='<div class="osop"><span class="who">вероятный комментарий эксперта:</span>Добрый день! '+esc(os.map((s,i)=>(os.length>1?(i+1)+". ":"")+s).join(" "))+'</div>';
+  }
+  if(P.crits.length){
+    h+='<div class="math"><table>'+P.crits.map(c=>'<tr><td>'+esc(c.label.slice(0,70))+'</td><td class="num">'+c.max+'</td></tr>').join("")+'<tr><td>Σ найдено</td><td class="num">'+sum+'</td></tr>'+(maxEff?'<tr><td>макс. балл ОС</td><td class="num">'+maxEff+'</td></tr>':'')+(P.mult?'<tr><td>повторяемость</td><td class="num">'+P.mult.n+' × '+P.mult.per+'</td></tr>':'')+'</table></div>';
+  }
+  out.innerHTML=h;
+}
+let tmr;
+["#c-text","#c-max","#c-type"].forEach(s=>$(s).addEventListener("input",()=>{clearTimeout(tmr);tmr=setTimeout(renderCheck,250)}));
+$("#c-run").addEventListener("click",renderCheck);
+$("#c-sample").addEventListener("click",()=>{$("#c-text").value=SAMPLE.text;$("#c-max").value=SAMPLE.max;$("#c-type").value=SAMPLE.type;renderCheck()});
+$("#c-clear").addEventListener("click",()=>{$("#c-text").value="";$("#c-max").value="";renderCheck()});
+
+/* ---------- BUILD ---------- */
+const BSAMPLE={
+  name:"Индивидуальное задание",type:"cur",max:16,
+  issue:"Задание состоит из трёх частей и выполняется в рамках раздела «Инструменты разработки веб-игр». Каждая часть выдаётся после соответствующего практического занятия: преподаватель публикует условие и шаблон проекта (HTML/CSS/JS) ",
+  time:"",fmt:"ind",grp:"",
+  result:"веб-страница или прототип игры по шаблону, по одному на каждую часть",
+  example:"Часть 1: изменить CSS-стили в шаблоне, присланном преподавателем, в соответствии с заданной темой (например, «Интерфейс игры для музея естественной истории»). Часть 2: добавить интерактивный элемент на JavaScript. Часть 3: отрисовать игровую сцену на Canvas.",
+  questions:"",proc:"",rep:0,
+  crits:[
+    {name:"Корректное использование инструментов",max:8,top:"код запускается без ошибок, использованы инструменты, изученные в курсе",low:"есть ошибки, ломающие часть функциональности; инструменты применены не по назначению",zero:"код не запускается"},
+    {name:"Полнота выполнения",max:6,top:"выполнены все три части (по 2 балла за часть)",low:"часть выполнена не полностью: −1 балл за каждый невыполненный пункт",zero:"ни одна часть не сдана"},
+    {name:"Креативный подход",max:2,top:"решение развивает заданную тему и выходит за рамки шаблона",low:"шаблон изменён минимально",zero:"изменений по теме нет"}
+  ]};
+let crits=[];
+function critRow(c,i){
+  return '<div class="crit" data-i="'+i+'">'+
+   '<div class="crit-top"><label for="k-n-'+i+'">критерий<input id="k-n-'+i+'" data-k="name" value="'+esc(c.name)+'"></label>'+
+   '<label for="k-m-'+i+'">макс.<input id="k-m-'+i+'" data-k="max" type="number" min="0" inputmode="numeric" value="'+esc(c.max)+'"></label>'+
+   '<button type="button" class="warn" data-del="'+i+'" aria-label="удалить критерий">×</button></div>'+
+   '<label for="k-t-'+i+'">максимум, если…<input id="k-t-'+i+'" data-k="top" value="'+esc(c.top)+'"></label>'+
+   '<label for="k-l-'+i+'">снижается, если…<input id="k-l-'+i+'" data-k="low" value="'+esc(c.low)+'"></label>'+
+   '<label for="k-z-'+i+'">0 баллов, если…<input id="k-z-'+i+'" data-k="zero" value="'+esc(c.zero)+'"></label></div>';
+}
+function drawCrits(){$("#b-crits").innerHTML=crits.map(critRow).join("");buildOut()}
+$("#b-crits").addEventListener("input",e=>{
+  const box=e.target.closest(".crit");if(!box)return;const i=+box.dataset.i;const k=e.target.dataset.k;
+  crits[i][k]=k==="max"?(parseInt(e.target.value,10)||0):e.target.value;buildOut();
+});
+$("#b-crits").addEventListener("click",e=>{const d=e.target.closest("[data-del]");if(!d)return;crits.splice(+d.dataset.del,1);drawCrits()});
+$("#b-add").addEventListener("click",()=>{crits.push({name:"",max:0,top:"",low:"",zero:""});drawCrits()});
+
+const BF=["b-name","b-type","b-max","b-issue","b-time","b-fmt","b-grp","b-result","b-example","b-questions","b-proc","b-rep"];
+BF.forEach(id=>$("#"+id).addEventListener("input",buildOut));
+function loadBuild(s){
+  $("#b-name").value=s.name;$("#b-type").value=s.type;$("#b-max").value=s.max;$("#b-issue").value=s.issue;$("#b-time").value=s.time;
+  $("#b-fmt").value=s.fmt;$("#b-grp").value=s.grp;$("#b-result").value=s.result;$("#b-example").value=s.example;$("#b-questions").value=s.questions;
+  $("#b-proc").value=s.proc;$("#b-rep").value=s.rep;crits=s.crits.map(c=>({...c}));drawCrits();
+}
+let lastBuild={html:"",plain:""};
+function buildOut(){
+  const v=id=>$("#"+id).value.trim();
+  const type=v("b-type");$("#b-questions-wrap").hidden=type!=="pa";
+  const max=parseInt(v("b-max"),10)||0;const rep=parseInt(v("b-rep"),10)||0;
+  const missing=[];
+  const T=(val,what)=>{if(val) return {h:esc(val),p:val};missing.push(what);return {h:'<span class="todo">[уточнить: '+esc(what)+']</span>',p:"[уточнить: "+what+"]"}};
+  const parts=[];// [title, htmlBody, plainBody]
+  const issue=T(v("b-issue"),"как и где выдаётся задание");
+  const proc0=v("b-proc");
+  parts.push(["Регламент выполнения.",issue.h,issue.p]);
+  const time=T(v("b-time"),"срок выполнения");
+  const fmt=v("b-fmt")==="grp"?("групповой"+(v("b-grp")?" ("+v("b-grp")+")":"")):"индивидуальный";
+  const res=v("b-result");
+  parts.push(["Время и формат.","Срок: "+time.h+". Формат: "+esc(fmt)+"."+(res?" Результат: "+esc(res)+".":""),"Срок: "+time.p+". Формат: "+fmt+"."+(res?" Результат: "+res+".":"")]);
+  const ex=T(v("b-example"),"конкретный пример задания");
+  parts.push(["Пример задания.",ex.h,ex.p]);
+  if(type==="pa"){
+    const qs=v("b-questions").split(/\n/).map(s=>s.trim()).filter(Boolean);
+    if(qs.length) parts.push(["Перечень вопросов для подготовки.","<br>"+qs.map((q,i)=>(i+1)+". "+esc(q)).join("<br>"),"\n"+qs.map((q,i)=>(i+1)+". "+q).join("\n")]);
+    else {missing.push("перечень вопросов");parts.push(["Перечень вопросов для подготовки.",'<span class="todo">[уточнить: перечень вопросов]</span>',"[уточнить: перечень вопросов]"])}
+  }
+  const proc=T(proc0,"куда и как сдаётся результат");
+  parts.push(["Процедура представления результатов.",proc.h,proc.p]);
+  const per=rep>1?Math.round(max/rep*100)/100:max;
+  if(rep>1) parts.push(["Начисление баллов.","Оценочное средство применяется "+rep+" раз(а) в течение семестра; за каждое выполнение можно получить до "+per+" баллов; итого до "+max+" баллов.","Оценочное средство применяется "+rep+" раз(а) в течение семестра; за каждое выполнение можно получить до "+per+" баллов; итого до "+max+" баллов."]);
+  const sum=crits.reduce((a,c)=>a+(+c.max||0),0);
+  const target=rep>1?per:max;
+  const sumEl=$("#b-sum");
+  if(!target){sumEl.className="sum";sumEl.textContent="Σ "+sum+" · укажи макс. балл ОС"}
+  else if(sum===target){sumEl.className="sum ok";sumEl.textContent="Σ "+sum+" / "+target+(rep>1?" за одно выполнение":"")+" ✓ сходится"}
+  else {sumEl.className="sum bad";sumEl.textContent="Σ "+sum+" / "+target+(rep>1?" за одно выполнение":"")+" ✗ не сходится: ОСОП вернёт";missing.push("сумма критериев ≠ "+target)}
+  crits.forEach((c,i)=>{if(!c.name)missing.push("название критерия "+(i+1));if(!c.top||!c.low)missing.push("уровни у «"+(c.name||"критерия "+(i+1))+"»")});
+  const cap="Критерии и шкала оценивания (макс. "+target+" баллов"+(rep>1?" за одно выполнение":"")+").";
+  const td=x=>x?esc(x):'<span class="todo">[уточнить]</span>';
+  const tbl='<table><thead><tr><th>Критерий</th><th>Мин. балл</th><th>Макс. балл</th><th>Максимальный балл, если…</th><th>Балл снижается, если…</th><th>0 баллов, если…</th></tr></thead><tbody>'+
+    crits.map(c=>'<tr><td>'+td(c.name)+'</td><td>0</td><td>'+(+c.max||0)+'</td><td>'+td(c.top)+'</td><td>'+td(c.low)+'</td><td>'+td(c.zero)+'</td></tr>').join("")+
+    '<tr><td><b>Итого</b></td><td>0</td><td><b>'+sum+'</b></td><td></td><td></td><td></td></tr></tbody></table>';
+  const ptxt=["Критерий\tМин. балл\tМакс. балл\tМаксимальный балл, если…\tБалл снижается, если…\t0 баллов, если…"].concat(crits.map(c=>[c.name||"[уточнить]",0,+c.max||0,c.top||"[уточнить]",c.low||"[уточнить]",c.zero||"[уточнить]"].join("\t")),["Итого\t0\t"+sum]).join("\n");
+  let html=parts.map(p=>'<p><b>'+p[0]+'</b> '+p[1]+'</p>').join("")+'<p><b>'+cap+'</b></p>'+tbl;
+  let plain=parts.map(p=>p[0]+" "+p[2]).join("\n\n")+"\n\n"+cap+"\n"+ptxt;
+  $("#b-out").innerHTML=html;
+  $("#b-missing").textContent=missing.length?"осталось уточнить: "+missing.join(" · "):"";
+  // clean html for clipboard: no highlight spans
+  lastBuild={html:html.replace(/<span class="todo">(.*?)<\/span>/g,"$1"),plain};
+}
+$("#b-copy").addEventListener("click",()=>{
+  const t=$("#b-toast");
+  const done=m=>{t.textContent=m;setTimeout(()=>t.textContent="",4000)};
+  try{
+    if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){
+      navigator.clipboard.write([new ClipboardItem({"text/html":new Blob([lastBuild.html],{type:"text/html"}),"text/plain":new Blob([lastBuild.plain],{type:"text/plain"})})])
+       .then(()=>done("скопировано с таблицей. Вставь в поле «Описание оценочного средства»."))
+       .catch(()=>fallbackCopy(done));
+    }else fallbackCopy(done);
+  }catch(e){fallbackCopy(done)}
+});
+function fallbackCopy(done){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(lastBuild.plain).then(()=>done("скопировано как текст (таблица через табуляцию)")).catch(()=>selectOut(done));
+  }else selectOut(done);
+}
+function selectOut(done){const r=document.createRange();r.selectNodeContents($("#b-out"));const s=getSelection();s.removeAllRanges();s.addRange(r);done("выделено: нажми Ctrl+C / ⌘C")}
+$("#b-tocheck").addEventListener("click",()=>{
+  $("#c-text").value=lastBuild.plain;$("#c-max").value=$("#b-max").value;$("#c-type").value=$("#b-type").value;location.hash="#check";renderCheck();
+});
+
+/* ---------- RULES table ---------- */
+function renderRules(){
+  $("#r-table tbody").innerHTML=Object.entries(RULES).map(([id,r])=>'<tr><td class="id">'+id+(feedCounts[id]?' ('+feedCounts[id]+')':'')+'</td><td'+(r.hyp?' class="hyp"':'')+'>'+esc(r.t)+'</td><td class="src">'+esc(r.src)+'</td></tr>').join("");
+}
+
+/* ---------- FEED ---------- */
+const TAGRX={
+  R1:/таблиц/i,
+  R2:/(снима|за что|шкал\w* оценивания|максимальный балл, за что|условия получения балла)/i,
+  R3:/(с указанием баллов|сколько баллов|баллы, которые соответствуют|итоговое количество)/i,
+  R4:/(процесс получения|получения индивидуального|как студент получает)/i,
+  R5:/(пример|темы или статьи|примерные темы|названия)/i,
+  R6:/(тайминг|объ[её]м|время на выполнение|количество заданий)/i,
+  R7:/(формат)/i,
+  R8:/(цели|результатов выполнения|предполагаемые результаты)/i,
+  R9:/(пререквизит|входные знания)/i
+};
+const tagsOf=t=>Object.keys(TAGRX).filter(k=>TAGRX[k].test(t||""));
+const OUT={wait:["ждём","wait"],ok:["прошло","ok"],bad:["снова вернули","bad"]};
+let db=null,entries=[];
+$("#f-comment").addEventListener("input",()=>{const t=tagsOf($("#f-comment").value);$("#f-tags").textContent=t.length?"теги: "+t.map(k=>k+" "+RULES[k].t.toLowerCase().slice(0,40)+"…").join(" · "):""});
+try{$("#f-date").value=new Date().toISOString().slice(0,10)}catch(e){}
+
+function renderFeed(){
+  feedCounts={};
+  entries.forEach(e=>(e.tags||[]).forEach(t=>feedCounts[t]=(feedCounts[t]||0)+1));
+  const maxC=Math.max(1,...Object.values(feedCounts));
+  const st=Object.keys(TAGRX).map(k=>[k,feedCounts[k]||0]).sort((a,b)=>b[1]-a[1]);
+  $("#f-stats").innerHTML=entries.length?st.map(([k,c])=>'<div><span>'+k+' '+esc(RULES[k].t.split(/[:;(]/)[0].slice(0,26))+'</span><span class="b">'+"█".repeat(Math.round(c/maxC*24))+'</span><span class="c">'+c+'</span></div>').join("")+'<p class="hint">замечаний в ленте: '+entries.length+'</p>':'<p class="hint">Пока пусто. Первая запись появится здесь.</p>';
+  const list=$("#f-list");
+  if(!entries.length){list.innerHTML='<p class="empty">В ленте пока нет замечаний. Добавь первое через форму выше: дата, id РПД и текст комментария эксперта.</p>'}
+  else list.innerHTML=entries.map(e=>{
+    const o=OUT[e.outcome]||OUT.wait;
+    return '<article class="entry" data-id="'+esc(e.id)+'">'+
+      '<div class="meta"><b>'+esc(e.course||"без названия")+'</b><span>'+(e.rpd?"id "+esc(e.rpd):"")+'</span><span>'+(e.date?esc(e.date.split("-").reverse().join(".")):"дата ?")+'</span><span>'+(e.expert?esc(e.expert):"эксперт ?")+'</span><span>раунд '+esc(e.round||1)+'</span><span class="pill '+o[1]+'">'+o[0]+'</span></div>'+
+      '<div class="c">'+esc(e.comment)+'</div>'+
+      '<div>'+(e.tags||[]).map(t=>'<span class="chip">'+t+'</span>').join("")+'</div>'+
+      (e.fix?'<div class="fix">исправили: '+esc(e.fix)+'</div>':'')+
+      (db?'<details><summary class="hint" style="cursor:pointer">дописать итог</summary><div class="view" style="gap:8px;margin-top:8px">'+
+        '<label for="fx-'+esc(e.id)+'">что исправили<textarea id="fx-'+esc(e.id)+'" rows="2" data-f="fix">'+esc(e.fix||"")+'</textarea></label>'+
+        '<label for="fo-'+esc(e.id)+'">итог<select id="fo-'+esc(e.id)+'" data-f="outcome">'+Object.entries(OUT).map(([k,v])=>'<option value="'+k+'"'+(k===(e.outcome||"wait")?" selected":"")+'>'+v[0]+'</option>').join("")+'</select></label>'+
+        '<div class="btns"><button type="button" data-save="'+esc(e.id)+'">сохранить</button></div></div></details>':'')+
+      '</article>'}).join("");
+  renderRules();
+  if(location.hash==="#check"||!location.hash) renderCheck();
+}
+$("#f-list").addEventListener("click",async ev=>{
+  const b=ev.target.closest("[data-save]");if(!b||!db)return;
+  const art=b.closest(".entry");const id=b.dataset.save;
+  b.disabled=true;
+  try{await db.update(id,{fix:art.querySelector('[data-f="fix"]').value.trim(),outcome:art.querySelector('[data-f="outcome"]').value});}
+  catch(e){b.textContent="не сохранилось: нет прав на запись";}
+  b.disabled=false;
+});
+$("#f-form").addEventListener("submit",async ev=>{
+  ev.preventDefault();
+  const t=$("#f-toast");
+  if(!db){t.textContent="Лента сейчас недоступна: нет связи с хранилищем.";return}
+  const comment=$("#f-comment").value.trim();if(!comment){t.textContent="Вставь текст замечания.";return}
+  const date=$("#f-date").value;
+  const doc={date,rpd:$("#f-rpd").value.trim(),course:$("#f-course").value.trim(),expert:$("#f-expert").value.trim(),round:parseInt($("#f-round").value,10)||1,comment,tags:tagsOf(comment),fix:$("#f-fix").value.trim(),outcome:"wait",ts:(Date.parse(date)||Date.now())};
+  $("#f-submit").disabled=true;
+  try{await db.add(doc);t.textContent="Записано. Правила "+(doc.tags.join(", ")||"—")+" получили +1.";["#f-comment","#f-fix","#f-rpd","#f-course","#f-expert"].forEach(s=>$(s).value="");$("#f-tags").textContent=""}
+  catch(e){t.textContent=e&&e.code==="invalid_argument"?"Нет прав на запись: попроси владельца дать доступ.":"Не получилось сохранить, попробуй ещё раз."}
+  $("#f-submit").disabled=false;
+});
+
+/* Хранилище ленты: на claude.ai — встроенная база артефакта,
+   на своём сервере — HTTP API (server.py: GET/POST api/feed, PATCH api/feed/<id>). */
+const API="api/feed";
+function feedOff(msg){
+  $("#f-list").innerHTML='<p class="empty">'+msg+' Проверка и сборка ОС работают и без ленты.</p>';
+  $("#f-stats").innerHTML='<p class="hint">нет данных</p>';$("#f-submit").disabled=true;
+}
+async function claudeStore(){
+  if(!(window.claude&&window.claude.use)) return null;
+  let cdb=null;try{cdb=await window.claude.use("db")}catch(e){}
+  if(!cdb) return null;
+  return {
+    add:d=>cdb.collection("feed").add(d),
+    update:(id,p)=>cdb.collection("feed").doc(id).update(p),
+    watch:(next,fail)=>cdb.collection("feed").orderBy("ts","desc").limit(300).onSnapshot(s=>next(s.docs.map(d=>({id:d.id,...d.data()}))),fail)
+  };
+}
+async function httpStore(){
+  let r;try{r=await fetch(API,{headers:{"Accept":"application/json"}})}catch(e){return null}
+  if(!r.ok||!(r.headers.get("content-type")||"").includes("json")) return null;
+  let listener=null;
+  const load=async()=>{const res=await fetch(API,{headers:{"Accept":"application/json"}});if(!res.ok)throw new Error("load");const arr=await res.json();arr.sort((a,b)=>(b.ts||0)-(a.ts||0));listener&&listener(arr)};
+  const send=async(url,method,body)=>{const res=await fetch(url,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!res.ok){const e=new Error("save");e.code=res.status===403?"invalid_argument":"unavailable";throw e}await load()};
+  return {
+    add:d=>send(API,"POST",d),
+    update:(id,p)=>send(API+"/"+encodeURIComponent(id),"PATCH",p),
+    watch:(next,fail)=>{listener=next;load().catch(fail);setInterval(()=>{if(!document.hidden)load().catch(()=>{})},20000)}
+  };
+}
+async function startFeed(){
+  const offMsg="Лента недоступна: на claude.ai нужно войти в аккаунт, на своём сервере нужно запустить server.py.";
+  const timer=setTimeout(()=>{if(!db)feedOff(offMsg)},10000);
+  db=await httpStore()||await claudeStore();
+  clearTimeout(timer);
+  if(!db){feedOff(offMsg);return}
+  db.watch(arr=>{entries=arr;renderFeed()},()=>{$("#f-list").innerHTML='<p class="empty">Ленту не удалось загрузить. Обнови страницу позже.</p>'});
+}
+
+/* ---------- routing ---------- */
+const VIEWS=["check","build","rules","feed"];
+function route(){
+  const v=VIEWS.includes(location.hash.slice(1))?location.hash.slice(1):"check";
+  VIEWS.forEach(n=>{$("#v-"+n).hidden=n!==v});
+  document.querySelectorAll("nav a").forEach(a=>{if(a.dataset.v===v)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+}
+addEventListener("hashchange",route);
+route();
+$("#c-text").value=SAMPLE.text;$("#c-max").value=SAMPLE.max;renderCheck();
+loadBuild(BSAMPLE);renderRules();
+startFeed();
+})();
+</script>
